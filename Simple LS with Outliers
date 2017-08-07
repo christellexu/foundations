@@ -1,0 +1,114 @@
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as sm
+import matplotlib.pyplot as plt
+import keras
+from keras.models import Sequential
+from keras.layers.core import Activation, Dense
+
+
+#-----Simulating Linear Data-----
+# Code taken from http://peterroelants.github.io/posts/neural_network_implementation_part01/
+
+# np.random.seed(seed=1)
+np.random.seed(seed=8)
+
+#----Defining vector of input samples-----
+x = np.random.uniform(0, 1, 20)
+
+#-----Generating target values with noise-----
+def f(x):
+    return x * 2
+
+noise_variance = 0.2 #so things don't fit perfectly
+noise = np.random.randn(x.shape[0]) * noise_variance
+
+t = f(x) + noise
+
+# outlier if seed = 1
+# t[15] = 0.2 * t[15]
+
+# outlier if seed = 8
+t[1] = 0.2 * t[1] #may have to try multiple outliers
+
+for i in xrange(len(t)):
+    if np.random.random() < 0.1:
+        t[i] += 3
+
+plt.scatter(x, t)
+
+
+# plt.plot(x, t, "o")
+# plt.plot([0,1], [f(0), f(1)])
+
+#-----Define neural net function-----
+def neuralnet(x, w):
+    return x * w #in this case w is a scalar
+
+#-----Define cost function-----
+def cost(y, t):
+    return ((t-y)**2).sum()
+
+#-----Gradient / Partial of loss wrt weight-----
+def gradient(w, x, t):
+    return 2 * x * (neuralnet(x, w) - t)
+
+#-----Delta w-----
+def delta_w(w, x, t, learning_rate):
+    return learning_rate * gradient(w, x, t).sum()
+
+#-----Set initial weight parameter------
+w = 0.1
+
+#-----Set learning rate-----
+learning_rate = 0.1
+
+#-----Updates-----
+num_iterations = 200 #number of updates, greater the number, the closer to the true value
+
+w_cost = [(w, cost(neuralnet(x,w), t))] # List to store weights and cost values
+
+for i in range(num_iterations):
+    dw = delta_w(w, x, t, learning_rate) #defines the update
+    w = w - dw #updates weight
+    w_cost.append((w, cost(neuralnet(x, w), t)))
+
+
+
+#-----OLS-----
+# https://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame
+df = pd.DataFrame({"A": t, "B": x})
+result = sm.ols(formula="A ~B", data = df).fit()
+
+print result.params
+B = result.params[1]
+
+#-----Keras----- Fickle
+sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False)
+#lr = 0.1 0.0394
+#lr = 0.2 0.0393
+#lr = 0.3 0.0393
+#lr = 0.4 0.0393
+#lr = 0.5 0.0393
+#lr = 0.6 0.0393
+#lr = 0.7 0.0393
+#lr = 0.8 NA
+
+def baseline_model():
+    model = Sequential()
+    model.add(Dense(1, input_dim=1, activation='linear'))
+    model.compile(loss="mean_squared_error", optimizer=sgd)
+    return model
+
+regression = baseline_model()
+regression.fit(x, t, nb_epoch=200)
+regression.get_weights()
+
+
+#-----Compare-----
+plt.plot(x, t, "o", label = "t")
+plt.plot([0,1], [f(0), f(1)], label = "f(x)")
+plt.plot([0,1], [0*w, 1*w], label = "NN fitted")
+plt.plot([0,1], [0*B, 1*B], label = "OLS")
+plt.plot(x, regression.predict(x), label = "Keras NN")
+plt.legend()

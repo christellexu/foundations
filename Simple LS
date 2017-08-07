@@ -6,7 +6,6 @@ import keras
 from keras.models import Sequential
 from keras.layers.core import Dense
 
-
 #-----Simulating Linear Data-----
 
 #-----messier-----
@@ -36,7 +35,7 @@ np.random.seed(seed=1)
 
 # Code taken from http://peterroelants.github.io/posts/neural_network_implementation_part01/
 #----Defining vector of input samples-----
-x = np.random.uniform(0, 1, 20)
+x = np.random.uniform(0, 1, 40)
 
 #-----Generating target values with noise-----
 def f(x):
@@ -74,8 +73,8 @@ w = 0.1
 #until I decreased the learning rate
 #https://stackoverflow.com/questions/19928068/neural-network-weights-explode-in-linear-unit
 #I could have also decreased the initial weight
-learning_rate = 0.1
-
+# learning_rate = 0.1 #when sample size is 20
+learning_rate = 0.01
 
 #-----Updates-----
 num_iterations = 200 #number of updates, greater the number, the closer to the true value
@@ -125,7 +124,8 @@ B = result.params[1]
 #     cost_history = np.append(cost_history, sess.run(cost, feed_dict={X:x, Y:t}))
 
 #-----Keras----- Fickle
-sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 20
+# sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 20
+sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 40
 
 #lr = 0.1 0.0394
 #lr = 0.2 0.0393

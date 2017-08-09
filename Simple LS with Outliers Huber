@@ -1,0 +1,187 @@
+import numpy as np
+import pandas as pd
+import statsmodels.formula.api as sm
+import matplotlib.pyplot as plt
+import keras
+from keras.models import Sequential
+from keras.layers.core import Activation, Dense
+import scipy
+
+#-----Simulating Linear Data-----
+# Code taken from http://peterroelants.github.io/posts/neural_network_implementation_part01/
+
+# np.random.seed(seed=1)
+np.random.seed(seed=8)
+
+#----Defining vector of input samples-----
+# x = np.random.uniform(0, 1, 20)
+x = np.random.uniform(0, 1, 40)
+
+#-----Generating target values with noise-----
+def f(x):
+    return x * 2
+
+noise_variance = 0.2 #so things don't fit perfectly
+noise = np.random.randn(x.shape[0]) * noise_variance
+
+t = f(x) + noise
+
+# outlier if seed = 1
+# t[15] = 0.2 * t[15]
+
+# outlier if seed = 8
+# t[1] = 0.2 * t[1] #may have to try multiple outliers
+
+for i in xrange(len(t)):
+    if np.random.random() < 0.1:
+        t[i] += 2
+
+# plt.scatter(x, t)
+
+
+# plt.plot(x, t, "o")
+# plt.plot([0,1], [f(0), f(1)])
+
+#-----Define neural net function-----
+def neuralnet(x, w):
+    return x * w #in this case w is a scalar
+
+#-----Define cost function-----
+def cost(y, t):
+    return ((t-y)**2).sum()
+
+#-----Define huber cost function-----
+c = 2
+
+l = np.zeros(len(t))
+def huber(y, t, c):
+    for i in t:
+        return .5 * (t - y) ** 2 if np.all(abs((t - y) <= c)) else c * (2 * abs(t - y) - c)
+
+
+
+#-----LS Gradient / Partial of loss wrt weight-----
+def gradient(w, x, t):
+    return 2 * x * (neuralnet(x, w) - t)
+
+#-----LS Delta w-----
+def delta_w(w, x, t, learning_rate):
+    return learning_rate * gradient(w, x, t).sum()
+
+#-----Set initial weight parameter------
+w = 0.1
+w_hub = 0.1
+
+
+#-----Set learning rate-----
+# learning_rate = 0.1 #n = 20
+learning_rate = 0.01
+
+#-----LS NN Updates-----
+num_iterations = 200 #number of updates, greater the number, the closer to the true value
+
+w_cost = [(w, cost(neuralnet(x,w), t))] # List to store weights and cost values
+
+for i in range(num_iterations):
+    dw = delta_w(w, x, t, learning_rate) #defines the update
+    w = w - dw #updates weight
+    w_cost.append((w, cost(neuralnet(x, w), t)))
+
+#-----Huber Gradient----- you still need to change f(x) into nn
+# def huber_gradient(w_hub, x, t, c):
+#     for i in x:
+#         return x * (t - neuralnet(x, w_hub)) if np.all(abs(t - neuralnet(x, w_hub))) <= c else x * c * np.sign(t - neuralnet(x, w_hub))
+
+# r = t - neuralnet(x, w_hub)
+
+# def huber_gradient(x,r,c):
+#     for i in x:
+#         return x * (r) if np.all(abs(r)) <= c else x * c * np.sign(r)
+
+
+def huber_gradient(w_hub, x, t, c):
+    for i in x:
+        return x * (neuralnet(x, w_hub) - t) if np.all(abs(t - neuralnet(x, w_hub))) <= c else x * c * np.sign(
+            neuralnet(x, w_hub) - t)
+
+
+#-----Huber Delta-----
+# def hub_delta(w_hub, x, t, learning_rate):
+#     return learning_rate * huber_gradient(x, r, c).sum()
+#
+def hub_delta(w_hub, x, t, learning_rate):
+    return learning_rate * huber_gradient(w_hub, x, t, c).sum()
+
+#-----Set initial weight parameter------
+w_hub = 0.1
+learning_rate = 0.01
+c = 0.7 #what is the best way to choose this?
+
+#-----Experimenting with formula-----
+scipy.special.huber(1, t - neuralnet(x, w_hub))
+
+#-----Huber NN Updates-----
+num_iterations = 200
+w_h_cost = [(w_hub, huber(neuralnet(x,w_hub), t, c))] # List to store weights and cost values
+# w_h_cost = [(w, scipy.special.huber(1, t - neuralnet(x, w)))] # List to store weights and cost values
+
+for i in range(num_iterations):
+    dw_hub = hub_delta(w_hub, x, t, learning_rate)
+    w_hub = w_hub - dw_hub
+    w_h_cost.append((w_hub, huber(neuralnet(x, w_hub), t, c)))
+    # print w_h_cost
+
+# for i in range(num_iterations):
+#     dw_hub = hub_delta(w_hub, x, t, learning_rate)
+#     w_hub = w_hub - dw_hub
+#     w_h_cost.append((w_hub, huber(neuralnet(x, w_hub), t, c)))
+#     print w_h_cost
+
+# for i in range(num_iterations):
+#     dw = hub_delta(w, x, t, learning_rate)
+#     w = w - dw
+#     w_h_cost.append((w, scipy.special.huber(1, t - neuralnet(x, w))))
+#     print w_h_cost
+
+#-----OLS-----
+# https://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame
+df = pd.DataFrame({"A": t, "B": x})
+result = sm.ols(formula="A ~B", data = df).fit()
+
+print result.params
+B = result.params[1]
+
+#-----Keras----- Fickle
+# sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nester?ov=False) #n = 20
+sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 40
+#lr = 0.1 0.0394
+#lr = 0.2 0.0393
+#lr = 0.3 0.0393
+#lr = 0.4 0.0393
+#lr = 0.5 0.0393
+#lr = 0.6 0.0393
+#lr = 0.7 0.0393
+#lr = 0.8 NA
+
+def baseline_model():
+    model = Sequential()
+    model.add(Dense(1, input_dim=1, activation='linear'))
+    model.compile(loss="mean_squared_error", optimizer=sgd)
+
+    return model
+
+regression = baseline_model()
+regression.fit(x, t, nb_epoch=200)
+regression.get_weights()
+
+
+#-----Compare-----
+plt.plot(x, t, "o", label = "t")
+plt.plot([0,1], [f(0), f(1)], label = "f(x)")
+plt.plot([0,1], [0*w, 1*w], label = "NN fitted")
+plt.plot([0,1], [0*w_hub, 1*w_hub], label = "NN fitted with huber")
+plt.plot([0,1], [0*B, 1*B], label = "OLS")
+plt.plot(x, regression.predict(x), label = "Keras NN")
+plt.legend()
+
+#essentially, the closer w is to 2, the closer the line is to the true fitted line

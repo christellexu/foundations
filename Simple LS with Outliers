@@ -1,9 +1,8 @@
-#-----This document is different in that it works with multiple outliers rather than just one-----
-
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as sm
 import matplotlib.pyplot as plt
+import tensorflow as tf
 import keras
 from keras.models import Sequential
 from keras.layers.core import Activation, Dense
@@ -110,10 +109,42 @@ regression.fit(x, t, nb_epoch=200)
 regression.get_weights()
 
 
+#-----Tensorflow-----
+#https://github.com/nlintz/TensorFlow-Tutorials/blob/master/01_linear_regression.ipynb
+X = tf.placeholder('float')
+Y = tf.placeholder('float')
+
+def model(X, w_tf):
+    return tf.multiply(X, w_tf)
+
+w_tf = tf.Variable(0.1, name = 'weights')
+y_model = model(X, w_tf)
+
+cost = tf.square(Y - y_model)
+train_op = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
+
+with tf.Session() as sess:
+    tf.global_variables_initializer().run()
+
+    for i in range(num_iterations):
+        for (i, j) in zip(x, t):
+            sess.run(train_op, feed_dict={X:i, Y:j})
+
+    print(sess.run(w_tf))
+
+#manually input the output value  until I figure out how to do it automatically
+w_tf = 2.42448
+
+
+
+
+
 #-----Compare-----
 plt.plot(x, t, "o", label = "t")
 plt.plot([0,1], [f(0), f(1)], label = "f(x)")
 plt.plot([0,1], [0*w, 1*w], label = "NN fitted")
 plt.plot([0,1], [0*B, 1*B], label = "OLS")
 plt.plot(x, regression.predict(x), label = "Keras NN")
+plt.plot([0,1], [0*w_tf, 1*w_tf], label = "TensorFlow NN")
 plt.legend()
+

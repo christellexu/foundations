@@ -2,35 +2,14 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as sm
 import matplotlib.pyplot as plt
+import tensorflow as tf
 import keras
 from keras.models import Sequential
 from keras.layers.core import Dense
 
 #-----Simulating Linear Data-----
-
-#-----messier-----
-# x1 = 2.5 * np.random.randn(100) + 3
-# x2 = 2.5 * np.random.randn(100) + 3
-#
-# # x = np.linspace(0, 100, 1000)
-# epsilon = np.random.randn(100)
-# y = 5 + .6 * x1 + 0.3 * x2 + epsilon
-#
-#
-# plt.scatter(x1, y)
-# # plt.plot(x, y)
-
-# #cleaner
-# x = np.arange(100)
-# epsilon = np.random.uniform(-10, 10, size=(100,))
-# y = 5 + .6 * x + epsilon
-#
-# plt.scatter(x, y)
-# # plt.plot(x, y)
-
-
-np.random.seed(seed=1)
-# np.random.seed(seed=8)
+# np.random.seed(seed=1)
+np.random.seed(seed=8)
 
 
 # Code taken from http://peterroelants.github.io/posts/neural_network_implementation_part01/
@@ -87,11 +66,6 @@ for i in range(num_iterations):
     w_cost.append((w, cost(neuralnet(x, w), t)))
 
 
-for i in range(num_iterations):
-    dw = delta_w(w, x, t, learning_rate) #defines the update
-    w = w - dw #updates weight
-    w_cost.append((w, cost(neuralnet(x, w), t)))
-
 #-----OLS-----
 # https://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame
 df = pd.DataFrame({"A": t, "B": x})
@@ -99,29 +73,6 @@ result = sm.ols(formula="A ~B", data = df).fit()
 
 print result.params
 B = result.params[1]
-
-
-#-----tensorflow------
-# n_dim = x.shape[0]
-# training_epochs = 50
-# cost_history = np.empty(shape=[1],dtype=float)
-#
-# X = tf.placeholder(tf.float32,[None,n_dim])
-# Y = tf.placeholder(tf.float32)
-# W = tf.Variable(tf.ones([n_dim,1]))
-#
-# init = tf.initialize_all_variables()
-#
-# y_ = tf.matmul(X, W)
-# cost = tf.reduce_mean(tf.square(y_ - Y))
-# training_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost)
-#
-# sess = tf.Session()
-# sess.run(init)
-#
-# for epoch in range(training_epochs):
-#     sess.run(training_step, feed_dict={X:t(x), Y:t})
-#     cost_history = np.append(cost_history, sess.run(cost, feed_dict={X:x, Y:t}))
 
 #-----Keras----- Fickle
 # sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 20
@@ -146,6 +97,31 @@ regression = baseline_model()
 regression.fit(x, t, nb_epoch=200)
 regression.get_weights()
 
+#-----Tensorflow-----
+#https://github.com/nlintz/TensorFlow-Tutorials/blob/master/01_linear_regression.ipynb
+X = tf.placeholder('float')
+Y = tf.placeholder('float')
+
+def model(X, w_tf):
+    return tf.multiply(X, w_tf)
+
+w_tf = tf.Variable(0.1, name = 'weights')
+y_model = model(X, w_tf)
+
+cost = tf.square(Y - y_model)
+train_op = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
+
+with tf.Session() as sess:
+    tf.global_variables_initializer().run()
+
+    for i in range(num_iterations):
+        for (i, j) in zip(x, t):
+            sess.run(train_op, feed_dict={X:i, Y:j})
+
+    print(sess.run(w_tf))
+
+#manually input the output value  until I figure out how to do it automatically
+w_tf = 2.0109
 
 
 #-----Compare-----
@@ -154,4 +130,5 @@ plt.plot([0,1], [f(0), f(1)], label = "f(x)")
 plt.plot([0,1], [0*w, 1*w], label = "NN fitted")
 plt.plot([0,1], [0*B, 1*B], label = "OLS")
 plt.plot(x, regression.predict(x), label = "Keras NN")
+plt.plot([0,1], [0*w_tf, 1*w_tf], label = "TensorFlow NN")
 plt.legend()

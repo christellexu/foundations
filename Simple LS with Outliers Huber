@@ -2,10 +2,12 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as sm
 import matplotlib.pyplot as plt
-import keras
-from keras.models import Sequential
-from keras.layers.core import Activation, Dense
+import tensorflow as tf
+import statsmodels.api as sm
 import scipy
+
+
+
 
 #-----Simulating Linear Data-----
 # Code taken from http://peterroelants.github.io/posts/neural_network_implementation_part01/
@@ -50,8 +52,6 @@ def neuralnet(x, w):
 def cost(y, t):
     return ((t-y)**2).sum()
 
-#-----Define huber cost function-----
-c = 2
 
 l = np.zeros(len(t))
 def huber(y, t, c):
@@ -143,45 +143,54 @@ for i in range(num_iterations):
 #     w_h_cost.append((w, scipy.special.huber(1, t - neuralnet(x, w))))
 #     print w_h_cost
 
-#-----OLS-----
-# https://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame
-df = pd.DataFrame({"A": t, "B": x})
-result = sm.ols(formula="A ~B", data = df).fit()
+#-----Regression Huber-----
+#http://www.statsmodels.org/dev/rlm.html
+rlm_model = sm.RLM(t, x, M=sm.robust.norms.HuberT()) #M specifies the method for downweighting outliers
+rlm_results = rlm_model.fit()
+print(rlm_results.params)
+w_ols = float(rlm_results.params)
 
-print result.params
-B = result.params[1]
 
-#-----Keras----- Fickle
-# sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nester?ov=False) #n = 20
-sgd = keras.optimizers.SGD(lr=0.3, momentum=0.0, decay=0.0, nesterov=False) #n = 40
-#lr = 0.1 0.0394
-#lr = 0.2 0.0393
-#lr = 0.3 0.0393
-#lr = 0.4 0.0393
-#lr = 0.5 0.0393
-#lr = 0.6 0.0393
-#lr = 0.7 0.0393
-#lr = 0.8 NA
 
-def baseline_model():
-    model = Sequential()
-    model.add(Dense(1, input_dim=1, activation='linear'))
-    model.compile(loss="mean_squared_error", optimizer=sgd)
+#-----Tensorflow-----
+#https://github.com/nlintz/TensorFlow-Tutorials/blob/master/01_linear_regression.ipynb
+X = tf.placeholder('float')
+Y = tf.placeholder('float')
 
-    return model
 
-regression = baseline_model()
-regression.fit(x, t, nb_epoch=200)
-regression.get_weights()
+
+def model(X, w_tf):
+    return tf.multiply(X, w_tf)
+
+w_tf = tf.Variable(0.1, name = 'weights')
+y_model = model(X, w_tf)
+
+# cost = tf.square(Y - y_model)
+# train_op = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
+
+#this part had to be solved in Terminal which supports tf 1.2.0, and for some reason
+#my console only suppors 1.1.0
+loss = tf.losses.huber_loss(Y, y_model, delta = 0.5)
+train_op = tf.train.GradientDescentOptimizer(0.01).minimize(loss)
+
+
+with tf.Session() as sess:
+    tf.global_variables_initializer().run()
+    for i in range(num_iterations):
+        for (i, j) in zip(x, t):
+            sess.run(train_op, feed_dict={X:i, Y:j})
+    print(sess.run(w_tf))
+
+#manually input the output value  until I figure out how to do it automatically
+w_tf = 2.16952
 
 
 #-----Compare-----
 plt.plot(x, t, "o", label = "t")
 plt.plot([0,1], [f(0), f(1)], label = "f(x)")
-plt.plot([0,1], [0*w, 1*w], label = "NN fitted")
 plt.plot([0,1], [0*w_hub, 1*w_hub], label = "NN fitted with huber")
-plt.plot([0,1], [0*B, 1*B], label = "OLS")
-plt.plot(x, regression.predict(x), label = "Keras NN")
+plt.plot([0,1], [0*w_ols, 1*w_ols], label = "Regression Huber")
+plt.plot([0,1], [0*w_tf, 1*w_tf], label = "TensorFlow NN Huber")
 plt.legend()
 
 #essentially, the closer w is to 2, the closer the line is to the true fitted line
